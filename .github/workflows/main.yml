@@ -1,25 +1,34 @@
-name: Сборка OBS Android APK
+name: Подготовка сборки OBS Android
 
 on:
-  workflow_dispatch:
+workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Скачать репозиторий
-        uses: actions/checkout@v4
+inspect:
+runs-on: ubuntu-24.04
+steps:
+- name: Скачать репозиторий
+uses: actions/checkout@v4
 
-      - name: Распаковать проект
-        run: |
-          unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
-          cd extracted/OBS_for_Android-main
-          echo "Путь к проекту:"
-          pwd
-          echo "Файлы:"
-          ls -la
+  - name: Распаковать проект
+    run: |
+      unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
+      cd extracted/OBS_for_Android-main
+      echo "=== Содержимое scripts ==="
+      ls -la scripts
+      echo "=== Скрипт сборки APK ==="
+      cat scripts/build-frontend-apk-wsl.sh
+      echo "=== Скрипт проверки окружения ==="
+      if [ -f scripts/check-android-build-env.sh ]; then
+        cat scripts/check-android-build-env.sh
+      fi
+      echo "=== Инструкция по сборке ==="
+      sed -n '1,220p' README.md
 
-      - name: Проверить требования сборки
-        run: |
-          cd extracted/OBS_for_Android-main
-          sed -n '1,160p' scripts/build-frontend-apk-wsl.sh
+  - name: Сохранить инструкции
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: obs-build-details
+      path: extracted/OBS_for_Android-main/
+      if-no-files-found: warn
