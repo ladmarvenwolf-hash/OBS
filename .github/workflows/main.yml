@@ -1,18 +1,21 @@
-
 name: Подготовка сборки OBS Android
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  inspect:
+  prepare:
+    name: Проверка проекта OBS Android
     runs-on: ubuntu-24.04
 
     steps:
       - name: Скачать репозиторий
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Распаковать проект
+      - name: Проверить наличие архива
         shell: bash
         run: |
           set -euo pipefail
@@ -20,45 +23,64 @@ jobs:
           ARCHIVE="OBS_Android_APK_build_ready_RU.zip"
 
           if [ ! -f "$ARCHIVE" ]; then
-            echo "Ошибка: архив $ARCHIVE не найден в репозитории."
+            echo "::error::Архив $ARCHIVE не найден в корне репозитория."
+            echo "Содержимое корня репозитория:"
+            ls -la
             exit 1
           fi
 
+      - name: Распаковать и проверить проект
+        shell: bash
+        run: |
+          set -euo pipefail
+
           mkdir -p extracted
-          unzip -q "$ARCHIVE" -d extracted
+          unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
 
           PROJECT="extracted/OBS_for_Android-main"
 
           if [ ! -d "$PROJECT" ]; then
-            echo "Ошибка: папка проекта не найдена."
+            echo "::error::Папка OBS_for_Android-main не найдена."
             find extracted -maxdepth 3 -type f | head -100
             exit 1
           fi
 
-          echo "=== Содержимое scripts ==="
-          ls -la "$PROJECT/scripts" || true
+          {
+            echo "# Отчёт проверки OBS Android"
+            echo
+            echo "## Содержимое scripts"
+            ls -la "$PROJECT/scripts" 2>&1 || true
+            echo
+            echo "## Скрипт сборки APK"
+            if [ -f "$PROJECT/scripts/build-frontend-apk-wsl.sh" ]; then
+              cat "$PROJECT/scripts/build-frontend-apk-wsl.sh"
+            else
+              echo "Скрипт сборки не найден."
+            fi
+            echo
+            echo "## Проверка Android-окружения"
+            if [ -f "$PROJECT/scripts/check-android-build-env.sh" ]; then
+              cat "$PROJECT/scripts/check-android-build-env.sh"
+            else
+              echo "Скрипт проверки окружения не найден."
+            fi
+            echo
+            echo "## Инструкция README"
+            if [ -f "$PROJECT/README.md" ]; then
+              sed -n '1,220p' "$PROJECT/README.md"
+            else
+              echo "README.md не найден."
+            fi
+          } > extracted/BUILD_REPORT.md
 
-          echo "=== Скрипт сборки APK ==="
-          if [ -f "$PROJECT/scripts/build-frontend-apk-wsl.sh" ]; then
-            cat "$PROJECT/scripts/build-frontend-apk-wsl.sh"
-          else
-            echo "Скрипт сборки не найден."
-          fi
+          echo "Отчёт создан: extracted/BUILD_REPORT.md"
 
-          echo "=== Проверка окружения ==="
-          if [ -f "$PROJECT/scripts/check-android-build-env.sh" ]; then
-            cat "$PROJECT/scripts/check-android-build-env.sh"
-          fi
-
-          echo "=== Инструкция по сборке ==="
-          if [ -f "$PROJECT/README.md" ]; then
-            sed -n '1,220p' "$PROJECT/README.md"
-          fi
-
-      - name: Сохранить инструкции
+      - name: Сохранить инструкции и отчёт
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: obs-build-details
-          path: extracted/OBS_for_Android-main/
+          path: |
+            extracted/
           if-no-files-found: warn
+          retention-days: 7
