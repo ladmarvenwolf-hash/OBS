@@ -1,0 +1,30 @@
+name: Проверка сборки OBS Android
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Скачать исходный код
+        uses: actions/checkout@v4
+
+      - name: Проверить файлы проекта
+        run: |
+          echo "Проверка проекта OBS Android"
+          test -f scripts/build-frontend-apk-wsl.sh
+          test -f deps-android/build.sh
+          echo "Скрипты проекта найдены"
+
+      - name: Проверить свободное место
+        run: df -h /
+
+      - name: Проверить Java
+        run: java -version
+
+      - name: Проверить CMake и Ninja
+        run: |
+          cmake --version
+          ninja --version || true
+          
