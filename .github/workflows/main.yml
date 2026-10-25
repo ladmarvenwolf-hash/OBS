@@ -8,63 +8,74 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build APK
     runs-on: ubuntu-24.04
 
     steps:
       - name: Скачать репозиторий
         uses: actions/checkout@v5
 
-      - name: Установить Java и инструменты
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Подготовить проект
+      - name: Распаковать проект
         shell: bash
         run: |
           set -euo pipefail
-
-          sudo apt-get update
-          sudo apt-get install -y unzip zip cmake ninja-build
-
           mkdir -p extracted
           unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
+          find extracted -maxdepth 5 -type f \
+            \( -name 'build-frontend-apk-wsl.sh' \
+            -o -name 'gradlew' \
+            -o -name 'README.md' \)
 
-          echo "Содержимое проекта:"
-          find extracted -maxdepth 4 \
-            \( -name gradlew -o -name build.gradle \
-            -o -name build.gradle.kts \
-            -o -name build-frontend-apk-wsl.sh \) -print
+      - name: Установить Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Собрать APK
         shell: bash
         run: |
           set -euo pipefail
 
-          PROJECT="extracted/OBS_for_Android-main"
+          SCRIPT="$(find extracted -type f \
+            -name 'build-frontend-apk-wsl.sh' -print -quit)"
 
-          if [ -f "$PROJECT/gradlew" ]; then
-            cd "$PROJECT"
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          elif [ -f "$PROJECT/scripts/build-frontend-apk-wsl.sh" ]; then
-            cd "$PROJECT"
-            bash scripts/build-frontend-apk-wsl.sh
+          if [ -n "$SCRIPT" ]; then
+            cd "$(dirname "$SCRIPT")"
+            bash "$(basename "$SCRIPT")"
           else
-            echo "::error::Не найден поддерживаемый скрипт сборки."
-            echo "Нужно определить команду сборки из README проекта."
+            WRAPPER="$(find extracted -type f \
+              -name gradlew -print -quit)"
+
+            if [ -n "$WRAPPER" ]; then
+              cd "$(dirname "$WRAPPER")"
+              chmod +x gradlew
+              ./gradlew assembleDebug
+            else
+              echo "::error::Скрипт сборки или Gradle Wrapper не найден."
+              exit 1
+            fi
+          fi
+
+      - name: Найти и сохранить APK
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p apk-output
+          find extracted -type f -name '*.apk' \
+            -exec cp {} apk-output/ \;
+
+          if ! find apk-output -type f -name '*.apk' \
+            -print -quit | grep -q .; then
+            echo "::error::APK не найден после сборки."
             exit 1
           fi
 
-      - name: Сохранить APK
-        if: always()
+      - name: Загрузить APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: OBS-Android-APK
-          path: |
-            extracted/**/*.apk
-            extracted/**/build/outputs/**/*.apk
+          path: apk-output/*.apk
           if-no-files-found: error
           retention-days: 7
