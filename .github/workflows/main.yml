@@ -1,17 +1,23 @@
-name: Проверка сборки OBS Android
+name: Подготовка OBS Android
 
 on:
   workflow_dispatch:
 
 jobs:
-  check:
+  prepare:
     runs-on: ubuntu-24.04
     steps:
-      - name: Скачать исходный код
+      - name: Скачать репозиторий
         uses: actions/checkout@v4
 
-      - name: Показать структуру репозитория
+      - name: Распаковать проект
         run: |
-          pwd
-          ls -la
-          find . -maxdepth 3 -name build.sh -o -name build-frontend-apk-wsl.sh
+          unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
+          echo "Содержимое архива:"
+          find extracted -maxdepth 3 -type f \( -name build.sh -o -name build-frontend-apk-wsl.sh -o -name README.md \)
+
+      - name: Проверить инструменты
+        run: |
+          java -version
+          cmake --version
+          df -h /
