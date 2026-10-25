@@ -1,46 +1,25 @@
-name: Проверка проекта OBS Android
+name: Сборка OBS Android APK
 
 on:
   workflow_dispatch:
 
 jobs:
-  inspect:
+  build:
     runs-on: ubuntu-24.04
-
     steps:
       - name: Скачать репозиторий
         uses: actions/checkout@v4
 
-      - name: Распаковать архив
+      - name: Распаковать проект
         run: |
-          set -e
           unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
-          echo "=== ПАПКИ ПРОЕКТА ==="
-          find extracted -maxdepth 4 -type d -print
-          echo "=== ФАЙЛЫ СБОРКИ ==="
-          find extracted -maxdepth 8 -type f \( \
-            -name "build.sh" -o \
-            -name "build-frontend-apk-wsl.sh" -o \
-            -name "gradlew" -o \
-            -name "CMakeLists.txt" -o \
-            -name "README.md" \
-          \) -print | tee project-files.txt
-          echo "=== КОРЕНЬ РЕПОЗИТОРИЯ ==="
-          ls -lah
+          cd extracted/OBS_for_Android-main
+          echo "Путь к проекту:"
+          pwd
+          echo "Файлы:"
+          ls -la
 
-      - name: Проверить инструменты
+      - name: Проверить требования сборки
         run: |
-          java -version
-          cmake --version
-          df -h /
-
-      - name: Сохранить отчёт
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: obs-android-project-report
-          path: |
-            project-files.txt
-            extracted/
-          if-no-files-found: warn
-          retention-days: 3
+          cd extracted/OBS_for_Android-main
+          sed -n '1,160p' scripts/build-frontend-apk-wsl.sh
