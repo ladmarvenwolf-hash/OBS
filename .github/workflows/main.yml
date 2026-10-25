@@ -1,4 +1,4 @@
-name: Подготовка сборки OBS Android
+name: Сборка OBS Android APK
 
 on:
   workflow_dispatch:
@@ -7,80 +7,64 @@ permissions:
   contents: read
 
 jobs:
-  prepare:
-    name: Проверка проекта OBS Android
+  build:
+    name: Build Android APK
     runs-on: ubuntu-24.04
 
     steps:
       - name: Скачать репозиторий
         uses: actions/checkout@v5
 
-      - name: Проверить наличие архива
+      - name: Установить Java и инструменты
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Подготовить проект
         shell: bash
         run: |
           set -euo pipefail
 
-          ARCHIVE="OBS_Android_APK_build_ready_RU.zip"
-
-          if [ ! -f "$ARCHIVE" ]; then
-            echo "::error::Архив $ARCHIVE не найден в корне репозитория."
-            echo "Содержимое корня репозитория:"
-            ls -la
-            exit 1
-          fi
-
-      - name: Распаковать и проверить проект
-        shell: bash
-        run: |
-          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y unzip zip cmake ninja-build
 
           mkdir -p extracted
           unzip -q OBS_Android_APK_build_ready_RU.zip -d extracted
 
+          echo "Содержимое проекта:"
+          find extracted -maxdepth 4 \
+            \( -name gradlew -o -name build.gradle \
+            -o -name build.gradle.kts \
+            -o -name build-frontend-apk-wsl.sh \) -print
+
+      - name: Собрать APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
           PROJECT="extracted/OBS_for_Android-main"
 
-          if [ ! -d "$PROJECT" ]; then
-            echo "::error::Папка OBS_for_Android-main не найдена."
-            find extracted -maxdepth 3 -type f | head -100
+          if [ -f "$PROJECT/gradlew" ]; then
+            cd "$PROJECT"
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          elif [ -f "$PROJECT/scripts/build-frontend-apk-wsl.sh" ]; then
+            cd "$PROJECT"
+            bash scripts/build-frontend-apk-wsl.sh
+          else
+            echo "::error::Не найден поддерживаемый скрипт сборки."
+            echo "Нужно определить команду сборки из README проекта."
             exit 1
           fi
 
-          {
-            echo "# Отчёт проверки OBS Android"
-            echo
-            echo "## Содержимое scripts"
-            ls -la "$PROJECT/scripts" 2>&1 || true
-            echo
-            echo "## Скрипт сборки APK"
-            if [ -f "$PROJECT/scripts/build-frontend-apk-wsl.sh" ]; then
-              cat "$PROJECT/scripts/build-frontend-apk-wsl.sh"
-            else
-              echo "Скрипт сборки не найден."
-            fi
-            echo
-            echo "## Проверка Android-окружения"
-            if [ -f "$PROJECT/scripts/check-android-build-env.sh" ]; then
-              cat "$PROJECT/scripts/check-android-build-env.sh"
-            else
-              echo "Скрипт проверки окружения не найден."
-            fi
-            echo
-            echo "## Инструкция README"
-            if [ -f "$PROJECT/README.md" ]; then
-              sed -n '1,220p' "$PROJECT/README.md"
-            else
-              echo "README.md не найден."
-            fi
-          } > extracted/BUILD_REPORT.md
-
-          echo "Отчёт создан: extracted/BUILD_REPORT.md"
-
-      - name: Сохранить инструкции и отчёт
+      - name: Сохранить APK
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
-          name: obs-build-details
+          name: OBS-Android-APK
           path: |
-            extracted/
-          if-no-files-found: warn
+            extracted/**/*.apk
+            extracted/**/build/outputs/**/*.apk
+          if-no-files-found: error
           retention-days: 7
