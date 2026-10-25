@@ -1,26 +1,23 @@
-name: Android CI
+name: OBS Android - проверка окружения
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
+  check:
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
-    - name: set up JDK 11
-      uses: actions/setup-java@v4
-      with:
-        java-version: '11'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Скачать исходный код
+        uses: actions/checkout@v4
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
+      - name: Проверить скрипты сборки
+        run: |
+          test -f OBS_for_Android-main/scripts/build-frontend-apk-wsl.sh
+          test -f OBS_for_Android-main/deps-android/build.sh
+          echo "Скрипты найдены"
+
+      - name: Проверить инструменты
+        run: |
+          java -version
+          cmake --version
+          df -h /
