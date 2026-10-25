@@ -73,7 +73,7 @@ jobs:
 
       - name: Загрузить APK
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: OBS-Android-APK
           path: apk-output/*.apk
